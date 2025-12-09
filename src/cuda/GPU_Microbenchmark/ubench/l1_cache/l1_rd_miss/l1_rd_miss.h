@@ -34,12 +34,29 @@
 #endif
 
 // Measure latency of ITERS reads.
-__global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
+__global__ void l1_rd_miss(uint32_t *startClk, uint32_t *stopClk,
                        uint64_t *posArray, uint64_t *dsink)
 {
 
   // thread index
   uint32_t tid = threadIdx.x;
+
+  if (tid < THREADS_NUM)
+  {
+    // use ca modifier to cache the load in L1
+    for (uint32_t i = 0; i < REPEAT_TIMES; ++i)
+    {
+      uint64_t tmp;
+      asm volatile("{\t\n"
+                   "ld.global.ca.u64 %0, [%1];\n\t"
+                   "}"
+                   : "=l"(tmp)
+                   : "l"((uint64_t *)(posArray + i))
+                   : "memory");
+    }
+  }
+  // synchronize all threads
+  asm volatile("bar.sync 0;");  
 
   // one thread to initialize the pointer-chasing array
   if (tid == 0)
@@ -49,7 +66,7 @@ __global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
     }
     posArray[ARRAY_SIZE - 1] = (uint64_t)posArray;
   }
-
+  
   if (tid < THREADS_NUM)
   {
     // a register to avoid compiler optimization
@@ -95,10 +112,10 @@ __global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
     startClk[tid] = start;
     stopClk[tid] = stop;
     dsink[tid] = ptr1;
-  }
+  }  
 }
 
-float l1_lat(int argc, char *argv[])
+float l1_rd_miss(int argc, char *argv[])
 {
 
   intilizeDeviceProp(0, argc, argv);
@@ -123,7 +140,7 @@ float l1_lat(int argc, char *argv[])
   gpuErrchk(cudaMalloc(&posArray_g, ARRAY_SIZE * sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&dsink_g, THREADS_NUM * sizeof(uint64_t)));
 
-  l1_lat<<<config.BLOCKS_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, posArray_g, dsink_g);
+  l1_rd_miss<<<config.BLOCKS_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, posArray_g, dsink_g);
   gpuErrchk(cudaPeekAtLastError());
 
   gpuErrchk(cudaMemcpy(startClk, startClk_g, THREADS_NUM * sizeof(uint32_t),

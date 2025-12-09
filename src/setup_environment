@@ -81,15 +81,24 @@ if [ $CUDA_VERSION_MAJOR -eq 11 ]; then
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -std=c++14"
 fi
 if [ $CUDA_VERSION_MAJOR -eq 12 ]; then
+    # Generate both SASS (sm_XX) and PTX (compute_XX) for broad compatibility
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_61,code=sm_61"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_61,code=compute_61"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_70,code=sm_70"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_70,code=compute_70"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_75,code=sm_75"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_75,code=compute_75"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_80,code=sm_80"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_80,code=compute_80"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_86,code=sm_86"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_86,code=compute_86"
     if [ $CUDA_VERSION_MINOR -ge 8 ]; then
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_90,code=sm_90"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_90,code=compute_90"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_100,code=sm_100"
     export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -gencode=arch=compute_100,code=compute_100"
     fi
-    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -std=c++14"
+    export CUDA_CPPFLAGS="$CUDA_CPPFLAGS -std=c++14 -lineinfo"
 
 fi
 
@@ -157,6 +166,35 @@ fi
 
 export MAKE_ARGS="$MAKE_ARGS CUBLAS_LIB=cublas_static CUDNN_LIB=cudnn_static"
 export GENCODE_FLAGS=$CUDA_CPPFLAGS
+
+# Prefer a supported host compiler for NVCC to avoid "unsupported GNU version" errors.
+# 1) If CUDAHOSTCXX is not preset, try common supported versions (g++-12/11/10).
+# 2) If found, pass it via -ccbin; otherwise, fall back to -allow-unsupported-compiler.
+# 3) Also set CC/CXX for Makefiles that compile host code, but do not override if user already set them.
+if [ -z "${CUDAHOSTCXX}" ]; then
+    for _cxx in g++-12 g++-11 g++-10; do
+        if command -v "${_cxx}" >/dev/null 2>&1; then
+            export CUDAHOSTCXX=$(command -v "${_cxx}")
+            break
+        fi
+    done
+fi
+
+if [ -n "${CUDAHOSTCXX}" ]; then
+    # Tell nvcc to use this host C++ compiler
+    export NVCC_ADDITIONAL_ARGS="$NVCC_ADDITIONAL_ARGS -ccbin=${CUDAHOSTCXX}"
+    # Help non-nvcc host compilations match the chosen toolchain (best-effort, don't override user)
+    if [ -z "${CXX}" ]; then export CXX="${CUDAHOSTCXX}"; fi
+    # Try to align CC with the matching gcc if available (best-effort)
+    case "${CUDAHOSTCXX}" in
+        *g++-12) command -v gcc-12 >/dev/null 2>&1 && { if [ -z "${CC}" ]; then export CC=$(command -v gcc-12); fi; } ;;
+        *g++-11) command -v gcc-11 >/dev/null 2>&1 && { if [ -z "${CC}" ]; then export CC=$(command -v gcc-11); fi; } ;;
+        *g++-10) command -v gcc-10 >/dev/null 2>&1 && { if [ -z "${CC}" ]; then export CC=$(command -v gcc-10); fi; } ;;
+    esac
+else
+    # As a last resort, allow unsupported compiler; nvcc may still fail at build/runtime
+    export NVCC_ADDITIONAL_ARGS="$NVCC_ADDITIONAL_ARGS -allow-unsupported-compiler"
+fi
 
 export CUDA_CPPFLAGS="$CUDA_CPPFLAGS $NVCC_ADDITIONAL_ARGS"
 echo MAKE_ARGS=$MAKE_ARGS

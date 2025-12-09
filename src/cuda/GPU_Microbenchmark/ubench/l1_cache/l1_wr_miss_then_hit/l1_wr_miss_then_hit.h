@@ -34,7 +34,7 @@
 #endif
 
 // Measure latency of ITERS reads.
-__global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
+__global__ void l1_wr_miss_then_hit(uint32_t *startClk, uint32_t *stopClk,
                        uint64_t *posArray, uint64_t *dsink)
 {
 
@@ -48,6 +48,12 @@ __global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
       posArray[i] = (uint64_t)(posArray + i + 1);
     }
     posArray[ARRAY_SIZE - 1] = (uint64_t)posArray;
+
+    // wr miss/sector_miss should not happen again
+    for (uint32_t i = 0; i < (ARRAY_SIZE - 1); i++) {
+      posArray[i] = (uint64_t)(posArray + i + 1);
+    }
+    posArray[ARRAY_SIZE - 1] = (uint64_t)posArray;    
   }
 
   if (tid < THREADS_NUM)
@@ -85,7 +91,7 @@ __global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
                    : "l"((uint64_t *)ptr1)
                    : "memory");
       ptr1 = ptr0; // swap the register for the next load
-    }
+    } 
 
     // stop timing
     uint32_t stop = 0;
@@ -98,7 +104,7 @@ __global__ void l1_lat(uint32_t *startClk, uint32_t *stopClk,
   }
 }
 
-float l1_lat(int argc, char *argv[])
+float l1_wr_miss_then_hit(int argc, char *argv[])
 {
 
   intilizeDeviceProp(0, argc, argv);
@@ -123,7 +129,7 @@ float l1_lat(int argc, char *argv[])
   gpuErrchk(cudaMalloc(&posArray_g, ARRAY_SIZE * sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&dsink_g, THREADS_NUM * sizeof(uint64_t)));
 
-  l1_lat<<<config.BLOCKS_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, posArray_g, dsink_g);
+  l1_wr_miss_then_hit<<<config.BLOCKS_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, posArray_g, dsink_g);
   gpuErrchk(cudaPeekAtLastError());
 
   gpuErrchk(cudaMemcpy(startClk, startClk_g, THREADS_NUM * sizeof(uint32_t),

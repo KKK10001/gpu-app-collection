@@ -3,6 +3,15 @@ ifeq ($(GPUAPPS_SETUP_ENVIRONMENT_WAS_RUN), 0)
 $(error You must run "source setup_environment before calling make")
 endif
 
+GPUAPPS_ROOT := $(abspath ..)
+DEFAULT_INCLUDE := $(GPUAPPS_ROOT)/third_party/cuda-helpers $(abspath cuda-samples/Common)
+export GPUAPPS_ROOT
+export DEFAULT_INCLUDE
+NVCC_FLAGS += -I$(CUDA_INSTALL_PATH)/samples/common/inc -I$(GPUAPPS_ROOT)/third_party/cuda-helpers
+
+# targets=$(cd cuda/GPU_Microbenchmark/ubench && find l1_cache l2_cache -mindepth 1 -maxdepth 1 -type d -printf '$(basename %p) ')
+# MAKE_ARGS="ONLY=${targets}" make GPU_Microbenchmark -j12
+
 ifeq ($(CUDA_GT_7), 1)
 all:  GPU_Microbenchmark microbench rodinia_2.0-ft cutlass rodinia-3.1 pannotia proxy-apps ispass-2009 lonestargpu-2.0 polybench custom_apps heterosync cuda_samples mlperf_inference vllm huggingface # mlperf_training
 else
@@ -107,8 +116,16 @@ dragon-cdp: dragon-naive
 
 GPU_Microbenchmark:
 	mkdir -p $(BINDIR)/$(BINSUBDIR)/
-	$(SETENV) make $(MAKE_ARGS) -C cuda/GPU_Microbenchmark -j12
+	$(SETENV) $(MAKE) $(MAKE_ARGS) -C cuda/GPU_Microbenchmark -j12
 	cp -r cuda/GPU_Microbenchmark/bin/* $(BINDIR)/$(BINSUBDIR)/
+
+GPU_Microbenchmark_l1l2:
+	mkdir -p $(BINDIR)/$(BINSUBDIR)/
+	targets=`cd cuda/GPU_Microbenchmark/ubench && find l1_cache l2_cache -mindepth 1 -maxdepth 1 -type d | paste -sd, -`;
+	$(SETENV) $(MAKE) $(MAKE_ARGS) ONLY="$$targets" -C cuda/GPU_Microbenchmark -j12
+	cp -r cuda/GPU_Microbenchmark/bin/* $(BINDIR)/$(BINSUBDIR)/
+	@echo "Checking L1/L2 binaries under $(BINDIR)/$(BINSUBDIR)"
+	@ls "$(BINDIR)/$(BINSUBDIR)" | grep '^l[12]_'
 
 
 Deepbench_nvidia:
@@ -501,8 +518,31 @@ mlperf_training:
 
 cuda_samples:
 	mkdir -p $(BINDIR)/$(BINSUBDIR)/
-	mkdir -p ./cuda/cuda-samples/build && cd ./cuda/cuda-samples/build && cmake .. && make -j8
-	find $(GPUAPPS_ROOT)/src/cuda/cuda-samples/build/Samples  -type f -executable -exec mv {} "$(BINDIR)/$(BINSUBDIR)/" \; ;
+	# Ensure cuda-samples source exists (clone if missing or broken)
+	if [ ! -f ./cuda-samples/CMakeLists.txt ]; then \
+		echo "[cuda_samples] cuda-samples source missing or incomplete, re-cloning..."; \
+		rm -rf ./cuda-samples; \
+		git clone --depth 1 https://github.com/NVIDIA/cuda-samples.git ./cuda-samples; \
+	fi
+	mkdir -p ./cuda-samples/build
+	@# Build only if cmake >= 3.20; otherwise, keep headers only (Common/) for include paths
+	if cmake --version >/dev/null 2>&1; then \
+		if cmake --version | awk 'NR==1{split($$3,v,"."); exit !((v[1]>3)|| (v[1]==3 && v[2]>=20))}'; then \
+			cd ./cuda-samples/build && \
+				cmake .. \
+					$(if $(CUDAHOSTCXX),-DCMAKE_CUDA_HOST_COMPILER=$(CUDAHOSTCXX),) \
+					-DCMAKE_CUDA_FLAGS="$(CMAKE_CUDA_FLAGS) -allow-unsupported-compiler" && \
+				$(MAKE) -j8; \
+		else \
+			echo "[cuda_samples] Detected cmake < 3.20; skipping samples build (headers will still be usable)."; \
+		fi; \
+	else \
+		echo "[cuda_samples] cmake not found; skipping samples build (headers will still be usable)."; \
+	fi
+	@# Move built sample executables if they exist
+	if [ -d $(GPUAPPS_ROOT)/src/cuda-samples/build/Samples ]; then \
+		find $(GPUAPPS_ROOT)/src/cuda-samples/build/Samples -type f -executable -exec mv {} "$(BINDIR)/$(BINSUBDIR)/" \; ; \
+	fi
 
 pytorch_examples:
 	mkdir -p $(BINDIR)/$(BINSUBDIR)/
