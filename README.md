@@ -14,6 +14,7 @@ make data # pulls all the data files the apps need to run and puts them in a cen
 ```
 
 Some notes:
+- <font color=red>src/cuda/GPU_Microbenchmark下面默认需要mkdir bin，否则编译用例会报错copy binary的时候bin目录不存在</font>
 - Some apps have additional dependencies beyond what Accel-Sim requires. This is why we recommend building with the "-i" flag to see what you can get to build on your current system. Our internal regressions verify that all the apps do build, but covering all their dependencies can be difficult.
 To see all the apps that built successfully, run:
 ```
