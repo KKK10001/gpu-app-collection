@@ -48,10 +48,14 @@ inline void parseGpuConfigArgs(int argc, char *argv[])
         std::string flag(argv[i]);
         std::string val(argv[i + 1]);
 
-        if (flag == "--sm")
-            config.SM_NUMBER = to_uint(val);
-        else if (flag == "--ws")
-            config.WARP_SIZE = to_uint(val);
+        if (flag == "--sm") {
+          config.SM_NUMBER = to_uint(val);
+          printf("args with --sm ---> config.SM_NUMBER:%u\n", config.SM_NUMBER);
+        }            
+        else if (flag == "--ws") {
+          config.WARP_SIZE = to_uint(val);
+          printf("args with --ws ---> config.WARP_SIZE:%u\n", config.WARP_SIZE);
+        }            
         else if (flag == "--mtsm")
             config.MAX_THREADS_PER_SM = to_uint(val);
         else if (flag == "--msmem")
@@ -66,33 +70,53 @@ inline void parseGpuConfigArgs(int argc, char *argv[])
         else if (flag == "--mrpb")
             config.MAX_REG_PER_BLOCK = to_uint(val);
 
-        else if (flag == "--l1")
-            config.L1_SIZE = to_size(val);
-        else if (flag == "--l2")
-            config.L2_SIZE = to_size(val);
-
-        else if (flag == "--mem")
-            config.MEM_SIZE = to_size(val);
-        else if (flag == "--memclk")
-            config.MEM_CLK_FREQUENCY = to_uint(val);
-        else if (flag == "--membw")
-            config.MEM_BITWIDTH = to_uint(val);
-        else if (flag == "--clk")
-            config.CLK_FREQUENCY = to_uint(val);
-        else if (flag == "--tpb")
-            config.THREADS_PER_BLOCK = to_uint(val);
-        else if (flag == "--bpsm")
+        else if (flag == "--l1") {
+          config.L1_SIZE = to_size(val);
+          printf("args with --l1 ---> config.L1_SIZE:%zu\n", config.L1_SIZE);
+        }            
+        else if (flag == "--l2") {
+          config.L2_SIZE = to_size(val);
+          printf("args with --l2 ---> config.L2_SIZE:%zu\n", config.L2_SIZE);
+        }
+        else if (flag == "--mem") {
+          config.MEM_SIZE = to_size(val);
+          printf("args with --mem ---> config.MEM_SIZE:%zu\n", config.MEM_SIZE);
+        }
+        else if (flag == "--memclk") {
+          config.MEM_CLK_FREQUENCY = to_uint(val);
+          printf("args with --memclk ---> config.MEM_CLK_FREQUENCY:%u\n", config.MEM_CLK_FREQUENCY);
+        }
+        else if (flag == "--membw") {
+          config.MEM_BITWIDTH = to_uint(val);
+          printf("args with --membw ---> config.MEM_BITWIDTH:%u\n", config.MEM_BITWIDTH);
+        }
+        else if (flag == "--clk") {
+          config.CLK_FREQUENCY = to_uint(val);
+          printf("args with --clk ---> config.CLK_FREQUENCY:%u\n", config.CLK_FREQUENCY);
+        }
+        else if (flag == "--tpb") {
+          config.THREADS_PER_BLOCK = to_uint(val);
+          printf("args with --tpb ---> config.THREADS_PER_BLOCK:%u\n", config.THREADS_PER_BLOCK);
+        }
+        else if (flag == "--bpsm") {
             config.BLOCKS_PER_SM = to_uint(val);
-        else if (flag == "--tpsm")
+            printf("args with --bpsm ---> config.BLOCKS_PER_SM:%u\n", config.BLOCKS_PER_SM);
+        }
+        else if (flag == "--tpsm") {
             config.THREADS_PER_SM = to_uint(val);
-        else if (flag == "--blocks")
-            config.BLOCKS_NUM = to_uint(val);
-        else if (flag == "--total")
-            config.TOTAL_THREADS = to_uint(val);
-
-        else
-            continue;
-
+            printf("args with --tpsm ---> config.THREADS_PER_SM:%u\n", config.THREADS_PER_SM);
+        }
+        else if (flag == "--blocks") {
+          config.BLOCKS_NUM = to_uint(val);
+          printf("args with --blocks ---> config.BLOCKS_NUM:%u \n", config.BLOCKS_NUM);
+        }            
+        else if (flag == "--total") {
+          config.TOTAL_THREADS = to_uint(val);
+          printf("args with --total ---> config.TOTAL_THREADS:%u \n", config.TOTAL_THREADS);
+        }            
+        else {
+          continue;
+        }            
         ++i;
     }
     config.MAX_WARPS_PER_SM = config.MAX_THREADS_PER_SM / config.WARP_SIZE;

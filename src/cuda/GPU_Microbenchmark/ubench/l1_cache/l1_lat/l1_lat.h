@@ -123,7 +123,9 @@ float l1_lat(int argc, char *argv[])
   gpuErrchk(cudaMalloc(&posArray_g, ARRAY_SIZE * sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&dsink_g, THREADS_NUM * sizeof(uint64_t)));
 
+  printf("l1_lat<<<config.BLOCKS_NUM:%u, THREADS_NUM:%u>>>\n", config.BLOCKS_NUM, THREADS_NUM);
   l1_lat<<<config.BLOCKS_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, posArray_g, dsink_g);
+  
   gpuErrchk(cudaPeekAtLastError());
 
   gpuErrchk(cudaMemcpy(startClk, startClk_g, THREADS_NUM * sizeof(uint32_t),
